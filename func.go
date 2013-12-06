@@ -1,5 +1,7 @@
 package utils
 
+// 常用的函数
+
 import (
 	"crypto/hmac"
 	"crypto/md5"
@@ -14,6 +16,8 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"net"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -308,7 +312,7 @@ func Authcode(text string, params ...interface{}) string {
 func JsonEncode(m interface{}) string {
 	b, err := json.Marshal(m)
 	if err != nil {
-		fmt.Printf("Json Encode Error:%v\n", err)
+		LogError.Write("Json Encode Error:%v\n", err)
 		return ""
 	}
 	return string(b)
@@ -325,7 +329,7 @@ func JsonDecode(str string, v ...interface{}) interface{} {
 
 	err := json.Unmarshal([]byte(str), &m)
 	if err != nil {
-		fmt.Printf("Json Decode Error:%v\n", err)
+		LogError.Write("Json Decode Error:%v\n", err)
 		return nil
 	}
 
@@ -348,6 +352,14 @@ func TimeFormat(t time.Time, f int) (timeStr string) {
 	switch f {
 	case 0:
 		timeStr = t.Format("2006-01-02 15:04:05")
+	case 1:
+		timeStr = t.Format("2006-01-02")
+	case 2:
+		timeStr = t.Format("20060102150405")
+	case 3:
+		timeStr = t.Format("15:04:05")
+	case 4:
+		timeStr = t.Format("2006-01-02 15:04")
 	}
 
 	return
@@ -355,4 +367,30 @@ func TimeFormat(t time.Time, f int) (timeStr string) {
 
 func Now(f int) string {
 	return TimeFormat(time.Now(), f)
+}
+
+func GetLocalIp() (ip string) {
+	conn, err := net.Dial("udp", "google.com:80")
+	if err != nil {
+		LogError.Write("get local ip error:%#v", err)
+		return
+	}
+	defer conn.Close()
+	ip = strings.Split(conn.LocalAddr().String(), ":")[0]
+
+	return
+}
+
+func StructToMap(data interface{}) map[string]interface{} {
+	result := make(map[string]interface{})
+	elem := reflect.ValueOf(data).Elem()
+	size := elem.NumField()
+
+	for i := 0; i < size; i++ {
+		field := elem.Type().Field(i).Name
+		value := elem.Field(i).Interface()
+		result[field] = value
+	}
+
+	return result
 }
