@@ -1,5 +1,7 @@
 package utils
 
+// 日志记录，暂时只有输出，没有写文件
+
 import (
 	"fmt"
 	"log"
@@ -34,18 +36,27 @@ func (this LogLevel) String() string {
 
 type Log struct {
 	*log.Logger
-	Level    LogLevel // 对象LOG的输出等级
-	LogLevel LogLevel // 需要输出的等级
+	Level LogLevel // 对象LOG的输出等级
 }
 
+var (
+	WriteLogLevel = TRACE // 默认输出所有的信息
+	LogTrace      = Log{Level: TRACE}
+	LogDebug      = Log{Level: DEBUG}
+	LogInfo       = Log{Level: INFO}
+	LogWarn       = Log{Level: WARN}
+	LogError      = Log{Level: ERROR}
+	LogFatal      = Log{Level: FATAL}
+)
+
 func (this *Log) Write(format string, v ...interface{}) {
-	if this.Level >= this.LogLevel {
+	if this.Level >= WriteLogLevel {
 		// 需要输出日志
-		_, file, line, _ := runtime.Caller(1)
+		_, file, line, _ := runtime.Caller(2)
 		t := time.Now()
 		format = fmt.Sprintf("[%s] %s file:%s line:%d %s\n", t.Format("2006-01-02 15:04:05"), this.Level.String(), file, line, format)
 
-		this.Printf(format, v...)
+		fmt.Printf(format, v...)
 
 		if this.Level == FATAL {
 			// 需要退出程序

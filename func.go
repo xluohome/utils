@@ -102,6 +102,34 @@ func Atoi64(s string, d ...int64) int64 {
 	return i
 }
 
+// 转换成float32整型
+func Atof(s string, d ...float32) float32 {
+	f, err := strconv.ParseFloat(s, 32)
+	if err != nil {
+		if len(d) > 0 {
+			return d[0]
+		} else {
+			return 0
+		}
+	}
+
+	return float32(f)
+}
+
+// 转换成整型float64
+func Atof64(s string, d ...float64) float64 {
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		if len(d) > 0 {
+			return d[0]
+		} else {
+			return 0
+		}
+	}
+
+	return f
+}
+
 // md5
 func Md5Sum(text string) string {
 	h := md5.New()
@@ -312,7 +340,7 @@ func Authcode(text string, params ...interface{}) string {
 func JsonEncode(m interface{}) string {
 	b, err := json.Marshal(m)
 	if err != nil {
-		LogError.Write("Json Encode Error:%v\n", err)
+		LogError.Write("Json Encode Error:%s", err.Error())
 		return ""
 	}
 	return string(b)
@@ -329,7 +357,7 @@ func JsonDecode(str string, v ...interface{}) interface{} {
 
 	err := json.Unmarshal([]byte(str), &m)
 	if err != nil {
-		LogError.Write("Json Decode Error:%v\n", err)
+		LogError.Write("Json Decode Error:%s", err.Error())
 		return nil
 	}
 
@@ -372,7 +400,7 @@ func Now(f int) string {
 func GetLocalIp() (ip string) {
 	conn, err := net.Dial("udp", "google.com:80")
 	if err != nil {
-		LogError.Write("get local ip error:%#v", err)
+		LogError.Write("get local ip error:%s", err.Error())
 		return
 	}
 	defer conn.Close()
