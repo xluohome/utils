@@ -1622,3 +1622,51 @@ func (this *Redis) HMDel(hash string, keys ...string) bool {
 
 	return data.(int64) > 0
 }
+
+// 从left加入list
+func (this *Redis) LPush(key, value string) bool {
+	err := this.GetConn(key).Lpush(key, []byte(value))
+
+	if err != nil {
+		LogInfo.Write("LPUSH[key:%s][value:%s]error:%s", key, value, err.Error())
+		return false
+	}
+
+	return true
+}
+
+// 从left pop出来
+func (this *Redis) LPop(key string) string {
+	b, err := this.GetConn(key).Lpop(key)
+
+	if err != nil {
+		LogInfo.Write("LPOP[key:%s]error:%s", key, err.Error())
+		return ""
+	}
+
+	return string(b)
+}
+
+// 从right加入list
+func (this *Redis) RPush(key, value string) bool {
+	err := this.GetConn(key).Rpush(key, []byte(value))
+
+	if err != nil {
+		LogInfo.Write("RPUSH[key:%s][value:%s]error:%s", key, value, err.Error())
+		return false
+	}
+
+	return true
+}
+
+// 从right pop出来
+func (this *Redis) RPop(key string) string {
+	b, err := this.GetConn(key).Rpop(key)
+
+	if err != nil {
+		LogInfo.Write("RPOP[key:%s]error:%s", key, err.Error())
+		return ""
+	}
+
+	return string(b)
+}

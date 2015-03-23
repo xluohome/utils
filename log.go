@@ -47,14 +47,20 @@ var (
 	LogWarn       = Log{Level: WARN}
 	LogError      = Log{Level: ERROR}
 	LogFatal      = Log{Level: FATAL}
+	ShowDebug     = true // 是否显示debug信息
 )
 
 func (this *Log) Write(format string, v ...interface{}) {
 	if this.Level >= WriteLogLevel {
 		// 需要输出日志
-		_, file, line, _ := runtime.Caller(2)
+		_, file, line, _ := runtime.Caller(1)
 		t := time.Now()
-		format = fmt.Sprintf("[%s] %s file:%s line:%d %s\n", t.Format("2006-01-02 15:04:05"), this.Level.String(), file, line, format)
+
+		if ShowDebug {
+			format = fmt.Sprintf("[%s] %s file:%s line:%d %s\n", t.Format("2006-01-02 15:04:05"), this.Level.String(), file, line, format)
+		} else {
+			format = fmt.Sprintf("[%s] %s %s\n", t.Format("2006-01-02 15:04:05"), this.Level.String(), format)
+		}
 
 		fmt.Printf(format, v...)
 

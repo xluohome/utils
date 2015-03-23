@@ -3,6 +3,7 @@ package utils
 // 常用的函数
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/md5"
 	crand "crypto/rand"
@@ -15,9 +16,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math/rand"
+	"mime/multipart"
 	"net"
+	"net/http"
+	httpurl "net/url"
+	"os"
+	"path/filepath"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -220,10 +228,16 @@ func Range(m, n int) (b []int) {
 // params[2] 加密：过期时间
 // params[3] 动态秘钥长度 默认：4位 不能大于32位
 func Authcode(text string, params ...interface{}) string {
+	defer func() {
+		if err := recover(); err != nil {
+			LogInfo.Write("authcode error:%#v", err)
+		}
+	}()
+
 	l := len(params)
 
 	isEncode := false
-	key := ""
+	key := "abcdefghijklmnopqrstuvwxyz13550009575"
 	expiry := 0
 	cKeyLen := 4
 
@@ -292,12 +306,11 @@ func Authcode(text string, params ...interface{}) string {
 	// 字符串长度
 	textLen := len(text)
 	if textLen <= 0 {
-		return ""
+		panic(fmt.Sprintf("auth[%s]textLen<=0", text))
 	}
 
 	// 密匙簿
 	box := Range(0, 256)
-
 	// 对称算法
 	var rndKey []int
 	cryptKeyB := []byte(cryptKey)
@@ -333,6 +346,8 @@ func Authcode(text string, params ...interface{}) string {
 		return string(result[26:])
 	}
 
+	panic(fmt.Sprintf("auth[%s]", text))
+
 	return ""
 }
 
@@ -340,7 +355,7 @@ func Authcode(text string, params ...interface{}) string {
 func JsonEncode(m interface{}) string {
 	b, err := json.Marshal(m)
 	if err != nil {
-		LogError.Write("Json Encode Error:%s", err.Error())
+		LogInfo.Write("Json Encode Error:%s", err.Error())
 		return ""
 	}
 	return string(b)
@@ -357,7 +372,7 @@ func JsonDecode(str string, v ...interface{}) interface{} {
 
 	err := json.Unmarshal([]byte(str), &m)
 	if err != nil {
-		LogError.Write("Json Decode Error:%s", err.Error())
+		LogInfo.Write("Json Decode Error:%s", err.Error())
 		return nil
 	}
 
@@ -400,7 +415,7 @@ func Now(f int) string {
 func GetLocalIp() (ip string) {
 	conn, err := net.Dial("udp", "google.com:80")
 	if err != nil {
-		LogError.Write("get local ip error:%s", err.Error())
+		LogInfo.Write("get local ip error:%s", err.Error())
 		return
 	}
 	defer conn.Close()
@@ -421,4 +436,463 @@ func StructToMap(data interface{}) map[string]interface{} {
 	}
 
 	return result
+}
+
+func Keys(m map[string]interface{}) []string {
+	var keys []string
+	for k, _ := range m {
+		keys = append(keys, k)
+	}
+
+	return keys
+}
+
+func Values(m map[string]interface{}) []interface{} {
+	var values []interface{}
+	for _, v := range m {
+		values = append(values, v)
+	}
+
+	return values
+}
+
+func IsEmpty(val interface{}) bool {
+	v := reflect.ValueOf(val)
+	println(v.Kind(), reflect.Slice)
+	switch v.Kind() {
+	case reflect.Bool:
+		return val.(bool) == false
+	case reflect.String:
+		return val.(string) == ""
+	case reflect.Array:
+		fallthrough
+	case reflect.Slice:
+		fallthrough
+	case reflect.Map:
+		return v.Len() == 0
+	default:
+		return v.Interface() == reflect.ValueOf(0).Interface() || v.Interface() == reflect.ValueOf(0.0).Interface()
+	}
+
+	return false
+}
+
+func Urlencode(str string) string {
+	return base64.URLEncoding.EncodeToString([]byte(str))
+}
+
+func Urldecode(str string) string {
+	b, e := base64.URLEncoding.DecodeString(str)
+	if e != nil {
+		LogInfo.Write("urldecode error:%s", e.Error())
+		return ""
+	}
+
+	return string(b)
+}
+
+func Ip2long(ipstr string) (ip uint32) {
+	r := `^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})`
+	reg, err := regexp.Compile(r)
+	if err != nil {
+		return
+	}
+	ips := reg.FindStringSubmatch(ipstr)
+	if ips == nil {
+		return
+	}
+
+	ip1, _ := strconv.Atoi(ips[1])
+	ip2, _ := strconv.Atoi(ips[2])
+	ip3, _ := strconv.Atoi(ips[3])
+	ip4, _ := strconv.Atoi(ips[4])
+
+	if ip1 > 255 || ip2 > 255 || ip3 > 255 || ip4 > 255 {
+		return
+	}
+
+	ip += uint32(ip1 * 0x1000000)
+	ip += uint32(ip2 * 0x10000)
+	ip += uint32(ip3 * 0x100)
+	ip += uint32(ip4)
+
+	return
+}
+
+func Long2ip(ip uint32) string {
+	return fmt.Sprintf("%d.%d.%d.%d", ip>>24, ip<<8>>24, ip<<16>>24, ip<<24>>24)
+}
+
+func IsMac(mac string) bool {
+	if len(mac) != 17 {
+		return false
+	}
+
+	r := `^(?i:[0-9a-f]{2}):(?i:[0-9a-f]{2}):(?i:[0-9a-f]{2}):(?i:[0-9a-f]{2}):(?i:[0-9a-f]{2}):(?i:[0-9a-f]{2})`
+	reg, err := regexp.Compile(r)
+	if err != nil {
+		return false
+	}
+	m := reg.FindStringSubmatch(mac)
+	if m == nil {
+		return false
+	}
+
+	return true
+}
+
+func Exists(name string) bool {
+	_, err := os.Stat(name)
+	return !os.IsNotExist(err)
+}
+
+/**
+ * http请求
+ * string url 请求地址
+ * string method 请求方法 支持post get
+ * map params 请求的参数 \0@这样子的是上传文件
+ * map header 请求头
+ * bool rtn 是否返回结果 默认：true
+ */
+func HttpRequest(url, method string, args ...interface{}) (b bool, data string) {
+	params := make(map[string]string)  // 请求参数
+	headers := make(map[string]string) // header参数
+	rtn := true                        // 是否返回
+
+	argsLen := len(args)
+	if argsLen > 0 {
+		params = args[0].(map[string]string)
+	}
+	if argsLen > 1 {
+		headers = args[1].(map[string]string)
+	}
+	if argsLen > 2 {
+		rtn = args[2].(bool)
+	}
+
+	var req *http.Request
+	var err error
+	contentType := "application/x-www-form-urlencoded; charset=utf-8" // content-type
+
+	if "GET" == strings.ToUpper(method) {
+		// GET
+		var queryString string
+		for k, v := range params {
+			queryString += "&" + k + "=" + v
+		}
+		if queryString != "" {
+			if strings.Index(url, "?") != -1 {
+				// 有参数
+				url += queryString
+			} else {
+				// 无参数
+				url += "?" + queryString[1:]
+			}
+		}
+
+		req, err = http.NewRequest("GET", url, nil)
+	} else {
+		// POST
+		// 检查是否有上传的文件
+		var isFile bool // 是否有文件上传
+		for _, v := range params {
+			if strings.Index(v, "\x00@") == 0 {
+				// 那么有上传文件
+				isFile = true
+				break
+			}
+		}
+		if isFile {
+			bodyBuf := new(bytes.Buffer)
+			bodyWriter := multipart.NewWriter(bodyBuf)
+
+			for key, value := range params {
+				if strings.Index(value, "\x00@") == 0 {
+					value = strings.Replace(value, "\x00@", "", -1)
+					fileWriter, e := bodyWriter.CreateFormFile(key, filepath.Base(value))
+					if e != nil {
+						LogWarn.Write("request[%s]upload file error:%s", url, e.Error())
+						return
+					}
+					fh, e := os.Open(value)
+					if e != nil {
+						LogWarn.Write("request[%s]open file error:%s", url, e.Error())
+						return
+					}
+					defer fh.Close()
+
+					//iocopy
+					_, e = io.Copy(fileWriter, fh)
+					if e != nil {
+						LogWarn.Write("request[%s]copy file error:%s", url, e.Error())
+						return
+					}
+				} else {
+					bodyWriter.WriteField(key, value)
+				}
+			}
+
+			// 注：这个太重要了，居然之前没有注意到，如果不关闭，那么服务端是收不到提交文件的。
+			// Important if you do not close the multipart writer you will not have a terminating boundry
+			bodyWriter.Close()
+			contentType = bodyWriter.FormDataContentType()
+			req, err = http.NewRequest("POST", url, bodyBuf)
+		} else {
+			v := httpurl.Values{}
+			for key, value := range params {
+				v.Set(key, value)
+			}
+			req, err = http.NewRequest("POST", url, strings.NewReader(v.Encode()))
+		}
+	}
+
+	if err != nil {
+		LogWarn.Write("new request[%s]error:%s", url, err.Error())
+		return
+	}
+
+	// 加入头
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	//req.Header.Set("Connection", "close") // 关闭连接
+	req.Header.Set("Content-Type", contentType)
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		LogWarn.Write("do request[%s]error:%s", url, err.Error())
+		return
+	}
+	defer res.Body.Close()
+
+	if rtn {
+		// 需要返回
+		bData, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			LogWarn.Write("read request[%s]body error:%s", url, err.Error())
+			return
+		}
+
+		b = true
+		data = string(bData)
+	} else {
+		// 不需要返回
+		b = true
+	}
+
+	return
+}
+
+// Max returns the larger of a and b.
+func Max(a, b int) int {
+	if a > b {
+		return a
+	}
+
+	return b
+}
+
+// Min returns the smaller of a and b.
+func Min(a, b int) int {
+	if a < b {
+		return a
+	}
+
+	return b
+}
+
+// UMax returns the larger of a and b.
+func UMax(a, b uint) uint {
+	if a > b {
+		return a
+	}
+
+	return b
+}
+
+// UMin returns the smaller of a and b.
+func UMin(a, b uint) uint {
+	if a < b {
+		return a
+	}
+
+	return b
+}
+
+// MaxByte returns the larger of a and b.
+func MaxByte(a, b byte) byte {
+	if a > b {
+		return a
+	}
+
+	return b
+}
+
+// MinByte returns the smaller of a and b.
+func MinByte(a, b byte) byte {
+	if a < b {
+		return a
+	}
+
+	return b
+}
+
+// MaxInt8 returns the larger of a and b.
+func MaxInt8(a, b int8) int8 {
+	if a > b {
+		return a
+	}
+
+	return b
+}
+
+// MinInt8 returns the smaller of a and b.
+func MinInt8(a, b int8) int8 {
+	if a < b {
+		return a
+	}
+
+	return b
+}
+
+// MaxUint16 returns the larger of a and b.
+func MaxUint16(a, b uint16) uint16 {
+	if a > b {
+		return a
+	}
+
+	return b
+}
+
+// MinUint16 returns the smaller of a and b.
+func MinUint16(a, b uint16) uint16 {
+	if a < b {
+		return a
+	}
+
+	return b
+}
+
+// MaxInt16 returns the larger of a and b.
+func MaxInt16(a, b int16) int16 {
+	if a > b {
+		return a
+	}
+
+	return b
+}
+
+// MinInt16 returns the smaller of a and b.
+func MinInt16(a, b int16) int16 {
+	if a < b {
+		return a
+	}
+
+	return b
+}
+
+// MaxUint32 returns the larger of a and b.
+func MaxUint32(a, b uint32) uint32 {
+	if a > b {
+		return a
+	}
+
+	return b
+}
+
+// MinUint32 returns the smaller of a and b.
+func MinUint32(a, b uint32) uint32 {
+	if a < b {
+		return a
+	}
+
+	return b
+}
+
+// MaxInt32 returns the larger of a and b.
+func MaxInt32(a, b int32) int32 {
+	if a > b {
+		return a
+	}
+
+	return b
+}
+
+// MinInt32 returns the smaller of a and b.
+func MinInt32(a, b int32) int32 {
+	if a < b {
+		return a
+	}
+
+	return b
+}
+
+// MaxUint64 returns the larger of a and b.
+func MaxUint64(a, b uint64) uint64 {
+	if a > b {
+		return a
+	}
+
+	return b
+}
+
+// MinUint64 returns the smaller of a and b.
+func MinUint64(a, b uint64) uint64 {
+	if a < b {
+		return a
+	}
+
+	return b
+}
+
+// MaxInt64 returns the larger of a and b.
+func MaxInt64(a, b int64) int64 {
+	if a > b {
+		return a
+	}
+
+	return b
+}
+
+// MinInt64 returns the smaller of a and b.
+func MinInt64(a, b int64) int64 {
+	if a < b {
+		return a
+	}
+
+	return b
+}
+
+// 是否在列表中
+func InArray(l []string, v string) bool {
+	for _, val := range l {
+		if val == v {
+			return true
+		}
+	}
+
+	return false
+}
+
+func Trim(str string) string {
+	return strings.Trim(str, " \r\n\t")
+}
+
+func Split(str string) []string {
+	re := regexp.MustCompile("[ \t]+")
+	return re.Split(str, -1)
+}
+
+func CopyFile(dstName, srcName string) (written int64, err error) {
+	src, err := os.Open(srcName)
+	if err != nil {
+		return 0, err
+	}
+	defer src.Close()
+	dst, err := os.OpenFile(dstName, os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return 0, err
+	}
+	defer dst.Close()
+	return io.Copy(dst, src)
 }
