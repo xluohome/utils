@@ -15,6 +15,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"hash/crc32"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -23,6 +24,7 @@ import (
 	"net/http"
 	httpurl "net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -143,6 +145,12 @@ func Md5Sum(text string) string {
 	h := md5.New()
 	io.WriteString(h, text)
 	return fmt.Sprintf("%x", h.Sum(nil))
+}
+
+func Crc32(text string) string {
+	h := crc32.NewIEEE()
+	io.WriteString(h, text)
+	return fmt.Sprintf("%d", h.Sum32())
 }
 
 // rsa 加密
@@ -458,7 +466,7 @@ func Values(m map[string]interface{}) []interface{} {
 
 func IsEmpty(val interface{}) bool {
 	v := reflect.ValueOf(val)
-	println(v.Kind(), reflect.Slice)
+
 	switch v.Kind() {
 	case reflect.Bool:
 		return val.(bool) == false
@@ -895,4 +903,17 @@ func CopyFile(dstName, srcName string) (written int64, err error) {
 	}
 	defer dst.Close()
 	return io.Copy(dst, src)
+}
+
+func AbsolutePath() string {
+	file, err := exec.LookPath(os.Args[0])
+	if err != nil {
+		return "./"
+	}
+	path, _ := filepath.Abs(file)
+	if err != nil {
+		return "./"
+	}
+
+	return filepath.Dir(path) + "/"
 }

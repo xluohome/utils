@@ -54,12 +54,12 @@ func (this *Log) Write(format string, v ...interface{}) {
 	if this.Level >= WriteLogLevel {
 		// 需要输出日志
 		_, file, line, _ := runtime.Caller(1)
-		t := time.Now()
+		t := time.Now().Format("2006-01-02 15:04:05")
 
 		if ShowDebug {
-			format = fmt.Sprintf("[%s] %s file:%s line:%d %s\n", t.Format("2006-01-02 15:04:05"), this.Level.String(), file, line, format)
+			format = fmt.Sprintf("[%s] %s file:%s line:%d %s\n", t, this.Level.String(), file, line, format)
 		} else {
-			format = fmt.Sprintf("[%s] %s %s\n", t.Format("2006-01-02 15:04:05"), this.Level.String(), format)
+			format = fmt.Sprintf("[%s] %s %s\n", t, this.Level.String(), format)
 		}
 
 		fmt.Printf(format, v...)

@@ -1670,3 +1670,14 @@ func (this *Redis) RPop(key string) string {
 
 	return string(b)
 }
+
+func (this *Redis) Sadd(key, value string) bool {
+	_, err := this.GetConn(key).Sadd(key, []byte(value))
+
+	if err != nil {
+		LogInfo.Write("SADD[key:%s][value:%s]error:%s", key, value, err.Error())
+		return false
+	}
+
+	return true
+}
