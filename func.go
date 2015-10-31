@@ -363,7 +363,7 @@ func Authcode(text string, params ...interface{}) string {
 func JsonEncode(m interface{}) string {
 	b, err := json.Marshal(m)
 	if err != nil {
-		LogInfo.Write("Json Encode Error:%s", err.Error())
+		LogInfo.Write("Json Encode[%#v] Error:%s", m, err.Error())
 		return ""
 	}
 	return string(b)
@@ -380,7 +380,7 @@ func JsonDecode(str string, v ...interface{}) interface{} {
 
 	err := json.Unmarshal([]byte(str), &m)
 	if err != nil {
-		LogInfo.Write("Json Decode Error:%s", err.Error())
+		LogInfo.Write("Json Decode[%s] Error:%s", str, err.Error())
 		return nil
 	}
 
@@ -464,25 +464,30 @@ func Values(m map[string]interface{}) []interface{} {
 	return values
 }
 
-func IsEmpty(val interface{}) bool {
+func IsEmpty(val interface{}) (b bool) {
+	defer func() {
+		if err := recover(); err != nil {
+			b = true
+		}
+	}()
 	v := reflect.ValueOf(val)
 
 	switch v.Kind() {
 	case reflect.Bool:
-		return val.(bool) == false
+		b = (val.(bool) == false)
 	case reflect.String:
-		return val.(string) == ""
+		b = (val.(string) == "")
 	case reflect.Array:
 		fallthrough
 	case reflect.Slice:
 		fallthrough
 	case reflect.Map:
-		return v.Len() == 0
+		b = (v.Len() == 0)
 	default:
-		return v.Interface() == reflect.ValueOf(0).Interface() || v.Interface() == reflect.ValueOf(0.0).Interface()
+		b = (v.Interface() == reflect.ValueOf(0).Interface() || v.Interface() == reflect.ValueOf(0.0).Interface())
 	}
 
-	return false
+	return b
 }
 
 func Urlencode(str string) string {
