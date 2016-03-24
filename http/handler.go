@@ -48,6 +48,12 @@ type ResponseData struct {
 	Message     string
 }
 
+type PreHandler struct {
+}
+
+func (this *PreHandler) Action(req *http.Request, res http.ResponseWriter) {
+}
+
 type ControllerInterface interface {
 	BeforeAction() bool
 	Action() *ResponseData
@@ -191,6 +197,7 @@ type AppHandler struct {
 	proxys          map[string]*httputil.ReverseProxy
 	contentType     ContentType
 	notFoundHandler reflect.Type
+	preHandler      *PreHandler
 }
 
 func NewAppHandler() *AppHandler {
@@ -213,6 +220,10 @@ func (this *AppHandler) AddReverseProxy(path string, backend *httputil.ReversePr
 
 func (this *AppHandler) SetNotFoundHandler(handler ControllerInterface) {
 	this.notFoundHandler = reflect.Indirect(reflect.ValueOf(handler)).Type()
+}
+
+func (this *AppHandler) SetPreHandler(handler *PreHandler) {
+	this.preHandler = handler
 }
 
 // extends http.Handler
@@ -306,6 +317,10 @@ func (this *AppHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		} else {
 			panic(&ResponseData{Code: 404, Message: "Not Found"})
 		}
+	}
+
+	if this.preHandler != nil {
+		this.preHandler.Action(req, rw)
 	}
 
 	if this.routes[r] == REVERSE_PROXY_HANDLER {
