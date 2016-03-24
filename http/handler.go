@@ -36,7 +36,8 @@ func (this ContentType) String() string {
 type HandlerType int
 
 const (
-	REVERSE_PROXY HandlerType = iota
+	DEFAULT_HANDLER HandlerType = iota
+	REVERSE_PROXY_HANDLER
 	CONTROLLER_HANDLER
 )
 
@@ -207,7 +208,7 @@ func (this *AppHandler) AddHandler(path string, i ControllerInterface) {
 
 func (this *AppHandler) AddReverseProxy(path string, backend *httputil.ReverseProxy) {
 	this.proxys[path] = backend
-	this.routes[path] = REVERSE_PROXY
+	this.routes[path] = REVERSE_PROXY_HANDLER
 }
 
 func (this *AppHandler) SetNotFoundHandler(handler ControllerInterface) {
@@ -298,7 +299,7 @@ func (this *AppHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	if r == "" {
+	if r == "" || this.routes[r] == DEFAULT_HANDLER {
 		// 404
 		if this.notFoundHandler != nil {
 			handlerFunc(this.notFoundHandler)
@@ -307,7 +308,7 @@ func (this *AppHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	if this.routes[r] == REVERSE_PROXY {
+	if this.routes[r] == REVERSE_PROXY_HANDLER {
 		this.proxys[r].ServeHTTP(rw, req)
 	} else {
 		t := this.handlers[r]
