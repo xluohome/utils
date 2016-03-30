@@ -12,15 +12,15 @@ type Mysql struct {
     Db *sql.DB
 }
 
-func NewMysql(dsn string, maxConn int) (*Mysql, error) {
+func NewMysql(dsn string, maxIdleConn, maxOpenConn int) (*Mysql, error) {
     db, err := sql.Open("mysql", dsn)
 
     if err != nil {
         return nil, err
     }
 
-    db.SetMaxIdleConns(maxConn)
-    db.SetMaxOpenConns(maxConn)
+    db.SetMaxIdleConns(maxIdleConn)
+    db.SetMaxOpenConns(maxOpenConn)
 
     return &Mysql{Db: db}, nil
 }
