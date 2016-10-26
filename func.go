@@ -566,11 +566,13 @@ func Exists(name string) bool {
  * map params 请求的参数 \0@这样子的是上传文件
  * map header 请求头
  * bool rtn 是否返回结果 默认：true
+ * client client 请求客户端
  */
 func HttpRequest(url, method string, args ...interface{}) (b bool, data string) {
     params := make(map[string]string)  // 请求参数
     headers := make(map[string]string) // header参数
     rtn := true                        // 是否返回
+    var client *http.Client
 
     argsLen := len(args)
     if argsLen > 0 {
@@ -581,6 +583,11 @@ func HttpRequest(url, method string, args ...interface{}) (b bool, data string) 
     }
     if argsLen > 2 {
         rtn = args[2].(bool)
+    }
+    if argsLen > 3 {
+        client = args[3].(*http.Client)
+    } else {
+        client = http.DefaultClient
     }
 
     var req *http.Request
@@ -671,7 +678,7 @@ func HttpRequest(url, method string, args ...interface{}) (b bool, data string) 
     //req.Header.Set("Connection", "close") // 关闭连接
     req.Header.Set("Content-Type", contentType)
 
-    res, err := http.DefaultClient.Do(req)
+    res, err := client.Do(req)
     if err != nil {
         LogWarn.Write("do request[%s]error:%s", url, err.Error())
         return
